@@ -1,0 +1,23 @@
+name:                workalloc
+version:             0.1.0.0
+#synopsis:
+#description:
+homepage:            https://github.com/nathaningle/workalloc#readme
+license:             BSD3
+author:              Nathan Ingle
+maintainer:          elgni.nahtan@gmail.com
+copyright:           BSD3
+category:            Utility
+extra-source-files:
+- README.md
+
+ghc-options: -Wall -Wcompat -Werror -O2 -optl-fuse-ld=gold
+ld-options: -fuse-ld=gold
+
+dependencies:
+  - base >= 4.7 && < 5
+  - time
+
+executables:
+  workalloc:
+    main:             app/workalloc.hs
