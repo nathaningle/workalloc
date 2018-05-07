@@ -9,11 +9,16 @@ Portability : non-portable
 
 Visualise allotment of time for a work day.
 -}
-import           Control.Monad      ((<=<))
-import           Data.List          (groupBy, sortBy)
-import           Data.List.NonEmpty (NonEmpty)
-import qualified Data.List.NonEmpty as NE
-import           Data.Ord           (comparing)
+{-# LANGUAGE TypeApplications #-}
+import           Graphics.Rendering.Chart.Easy
+import           Graphics.Rendering.Chart.Backend.Cairo
+
+import           Control.Monad                          ((<=<))
+import           Data.Default                           (def)
+import           Data.List                              (groupBy, sortBy)
+import           Data.List.NonEmpty                     (NonEmpty)
+import qualified Data.List.NonEmpty                     as NE
+import           Data.Ord                               (comparing)
 import           Data.Time
 
 
@@ -63,7 +68,23 @@ sumIntervals intervals = (what, sum (NE.map snd intervals))
     what = fst (NE.head intervals)
 
 
+-- | Time expenditure item titles, for labelling the bar graph.
+titles :: [TimeSpent] -> [String]
+titles = map fst
+
+-- | Bar graph data.
+values :: [TimeSpent] -> [(String, [Double])]
+values totals = [("Total", map ((/ 3600.0) . realToFrac . snd) totals)]
+
+
 main :: IO ()
 main = do
-  Just events <- readLines <$> readFile "allocation.txt"
-  mapM_ print $ tallyIntervals $ filter (\x -> fst x /= "Out") $ makeIntervals events
+  Just events <- readLines <$> getContents
+  let totals = tallyIntervals $ filter (\x -> fst x /= "Out") $ makeIntervals events
+  mapM_ print totals
+
+  toFile def "total_hours.png" $ do
+    layout_title .= "Hours worked"
+    layout_x_axis . laxis_generate .= autoIndexAxis (map fst (values totals))
+    plot $ (plotBars . (plot_bars_spacing .~ BarsFixWidth 100.0)) <$> bars (titles totals) (addIndexes (map snd (values totals)))
+  putStrLn "ok"

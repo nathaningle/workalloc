@@ -2,3 +2,4 @@ workalloc.cabal
 /.stack-work/
 /allocation.txt
 .*.swp
+/*.png
