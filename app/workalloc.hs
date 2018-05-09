@@ -10,14 +10,14 @@ Portability : non-portable
 Visualise allotment of time for a work day.
 -}
 {-# LANGUAGE TypeApplications #-}
-import           Graphics.Rendering.Chart.Easy
 import           Graphics.Rendering.Chart.Backend.Cairo
+import           Graphics.Rendering.Chart.Easy
 
 import           Control.Monad                          ((<=<))
-import           Data.Default                           (def)
-import           Data.List                              (groupBy, sortBy)
+import           Data.List                              (groupBy, nub, sortBy)
 import           Data.List.NonEmpty                     (NonEmpty)
 import qualified Data.List.NonEmpty                     as NE
+import           Data.Maybe                             (fromMaybe)
 import           Data.Ord                               (comparing)
 import           Data.Time
 
@@ -72,19 +72,53 @@ sumIntervals intervals = (what, sum (NE.map snd intervals))
 titles :: [TimeSpent] -> [String]
 titles = map fst
 
+-- | Convert a 'NominalDiffTime' to hours.
+intervalToHours :: NominalDiffTime -> Double
+intervalToHours = (/ 3600.0) . realToFrac
+
 -- | Bar graph data.
 values :: [TimeSpent] -> [(String, [Double])]
-values totals = [("Total", map ((/ 3600.0) . realToFrac . snd) totals)]
+values totals = [("Total", map (intervalToHours . snd) totals)]
+
+
+-- | Note that we don't check that the days all match; we just take the first one.
+tagWithDay :: NonEmpty AllocStart -> (Day, NonEmpty AllocStart)
+tagWithDay events = (localDay (snd (NE.head events)), events)
+
+-- | Look up the value to be plotted for each cluster item title.
+intervalsToValues :: [String] -> [TimeSpent] -> [Double]
+intervalsToValues tasknames tasks = map (\t -> fromMaybe 0 (intervalToHours <$> lookup t tasks)) tasknames
+
+-- | Add an empty day (i.e. no tasks reported) before and after the actual data,
+-- in order to avoid the bar chart being cut off at the ends.
+padDays :: [a] -> [(Day, [Double])] -> [(Day, [Double])]
+padDays _ [] = []
+padDays tasknames xs = dayBefore : xs ++ [dayAfter]
+  where
+    dayBefore = (pred (fst (head xs)), replicate numTasks 0.0)
+    dayAfter  = (succ (fst (last xs)), replicate numTasks 0.0)
+    numTasks = length tasknames
 
 
 main :: IO ()
 main = do
   Just events <- readLines <$> getContents
-  let totals = tallyIntervals $ filter (\x -> fst x /= "Out") $ makeIntervals events
+  let intervals = makeIntervals events
+      totals = tallyIntervals $ filterOutIntervals intervals
+      eventsPerDay = NE.groupBy (equating (localDay . snd)) events
+      taggedEventsPerDay = map tagWithDay eventsPerDay
+      intervalsPerDay = map (fmap (filterOutIntervals . makeIntervals)) taggedEventsPerDay
+      reportedTasks = nub $ filter (/= "Out") $ map fst $ NE.toList events
+      values' = padDays reportedTasks $ map (fmap (intervalsToValues reportedTasks)) intervalsPerDay
   mapM_ print totals
 
+  toFile def "hours_per_day.png" $ do
+    layout_title .= "Hours worked per day"
+    plot $ (plotBars . (plot_bars_style .~ BarsStacked)) <$> bars reportedTasks values'
   toFile def "total_hours.png" $ do
-    layout_title .= "Hours worked"
+    layout_title .= "Hours worked per task"
     layout_x_axis . laxis_generate .= autoIndexAxis (map fst (values totals))
     plot $ (plotBars . (plot_bars_spacing .~ BarsFixWidth 100.0)) <$> bars (titles totals) (addIndexes (map snd (values totals)))
   putStrLn "ok"
+  where
+    filterOutIntervals = filter (\x -> fst x /= "Out")
