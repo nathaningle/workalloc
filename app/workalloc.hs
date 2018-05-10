@@ -9,7 +9,6 @@ Portability : non-portable
 
 Visualise allotment of time for a work day.
 -}
-{-# LANGUAGE TypeApplications #-}
 import           Graphics.Rendering.Chart.Backend.Cairo
 import           Graphics.Rendering.Chart.Easy
 
@@ -99,6 +98,18 @@ padDays tasknames xs = dayBefore : xs ++ [dayAfter]
     dayAfter  = (succ (fst (last xs)), replicate numTasks 0.0)
     numTasks = length tasknames
 
+-- | The special task name @Out@ indicates time spent out of the office, which
+-- we're not interested in charting.
+filterOutIntervals :: [TimeSpent] -> [TimeSpent]
+filterOutIntervals = filter (\x -> fst x /= "Out")
+
+-- | Find the hours worked per task, given the task names and a list of events.
+hoursPerTask :: [String] -> NonEmpty AllocStart -> [Double]
+hoursPerTask reportedTasks events = makeIntervals events
+                                  & filterOutIntervals
+                                  & tallyIntervals
+                                  & intervalsToValues reportedTasks
+
 
 main :: IO ()
 main = do
@@ -107,18 +118,16 @@ main = do
       totals = tallyIntervals $ filterOutIntervals intervals
       eventsPerDay = NE.groupBy (equating (localDay . snd)) events
       taggedEventsPerDay = map tagWithDay eventsPerDay
-      intervalsPerDay = map (fmap (filterOutIntervals . makeIntervals)) taggedEventsPerDay
       reportedTasks = nub $ filter (/= "Out") $ map fst $ NE.toList events
-      values' = padDays reportedTasks $ map (fmap (intervalsToValues reportedTasks)) intervalsPerDay
+      values' = padDays reportedTasks $ map (fmap (hoursPerTask reportedTasks)) taggedEventsPerDay
   mapM_ print totals
 
   toFile def "hours_per_day.png" $ do
     layout_title .= "Hours worked per day"
     plot $ (plotBars . (plot_bars_style .~ BarsStacked)) <$> bars reportedTasks values'
+    plot $ line "Scheduled hours" [[(fst (head values'), 7.5), (fst (last values'), 7.5)]]
   toFile def "total_hours.png" $ do
     layout_title .= "Hours worked per task"
     layout_x_axis . laxis_generate .= autoIndexAxis (map fst (values totals))
     plot $ (plotBars . (plot_bars_spacing .~ BarsFixWidth 100.0)) <$> bars (titles totals) (addIndexes (map snd (values totals)))
   putStrLn "ok"
-  where
-    filterOutIntervals = filter (\x -> fst x /= "Out")
