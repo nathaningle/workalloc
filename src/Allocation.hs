@@ -9,7 +9,8 @@ Portability : non-portable
 
 Summarise task allocation events into total time on task.
 -}
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
 module Allocation where
 
 import           Types
@@ -20,7 +21,7 @@ import           Data.Time       (diffUTCTime, localTimeToUTC, utc)
 
 -- | Determine the elapsed time between two 'AllocStart's.
 makeInterval :: AllocStart -> AllocStart -> Either AllocFailure TimeSpent
-makeInterval (what, starttime) (_, endtime)
+makeInterval (AllocStart what starttime) (AllocStart _ endtime)
   | starttime < endtime = Right TimeSpent { tsTaskName  = what
                                           , tsStartTime = starttime
                                           , tsDuration  = diffLocalTime endtime starttime

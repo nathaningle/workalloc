@@ -20,6 +20,9 @@ import           Data.List                              (nub, sort)
 import           Data.List.NonEmpty                     (NonEmpty)
 import qualified Data.List.NonEmpty                     as NE
 import qualified Data.Map.Strict                        as M
+import           Data.Text                              (Text)
+import qualified Data.Text                              as T
+import qualified Data.Text.IO                           as TIO
 import           Data.Time                              (Day,
                                                          LocalTime (localDay),
                                                          NominalDiffTime)
@@ -46,13 +49,13 @@ tagWithDay :: NonEmpty TimeSpent -> (Day, [TimeSpent])
 tagWithDay xs = (localDay (tsStartTime (NE.head xs)), NE.toList xs)
 
 -- | Determine the number of hours spent per named task.
-taskTotalsToHours :: [String] -> TaskTotals -> [Double]
+taskTotalsToHours :: [Text] -> TaskTotals -> [Double]
 taskTotalsToHours names totals = map (lookupTaskHours totals) names
   where
     lookupTaskHours (TaskTotals m) k = durationToHours $ M.findWithDefault 0 k m
 
 -- | Extract an ordered list of task names from a 'TaskTotals'.
-getTaskNames :: TaskTotals -> [String]
+getTaskNames :: TaskTotals -> [Text]
 getTaskNames (TaskTotals m) = M.keys m
 
 -- | Test equality after applying a function (by analogy to 'comparing').
@@ -65,7 +68,7 @@ equatingStartDay = equating (localDay . tsStartTime)
 
 -- | Prepare per-day chart data.
 taskTotalDataPerDay :: [TimeSpent] -> ([String], [(Day, [Double])])
-taskTotalDataPerDay intervals = (taskNames, padDays taskNames taskHoursPerDay)
+taskTotalDataPerDay intervals = (map T.unpack taskNames, padDays taskNames taskHoursPerDay)
   where
     taskNames = nub $ sort $ concatMap (getTaskNames . snd) taskTotalsPerDay
     taskTotalsPerDay = map tagAndTally $ NE.groupBy equatingStartDay intervals
@@ -75,7 +78,7 @@ taskTotalDataPerDay intervals = (taskNames, padDays taskNames taskHoursPerDay)
 -- | Prepare total chart data.  The principle of least surprise dictates that
 -- the type signature ought to resemble that from 'taskTotalDataPerDay'.
 taskTotalData :: [TimeSpent] -> ([String], [(String, [Double])])
-taskTotalData intervals = (taskNames, [("Total", taskHours)])
+taskTotalData intervals = (map T.unpack taskNames, [("Total", taskHours)])
   where
     TaskTotals mTaskTotals = tallyIntervals intervals
     (taskNames, taskDurations) = unzip $ M.toList mTaskTotals
@@ -84,8 +87,8 @@ taskTotalData intervals = (taskNames, [("Total", taskHours)])
 
 main :: IO ()
 main = do
-  Just events <- readLines <$> getContents
-  case makeIntervals events of
+  input <- TIO.getContents
+  case readEvents input >>= makeIntervals of
     Left e -> print e
     Right intervals -> do
       let (taskNames, taskHoursPerDay) = taskTotalDataPerDay $ filterOutIntervals intervals

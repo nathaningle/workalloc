@@ -16,10 +16,12 @@ ld-options: -fuse-ld=gold
 
 dependencies:
   - base >= 4.7 && < 5
+  - attoparsec
   - Chart
   - Chart-cairo
   - containers
   - data-default
+  - text
   - time
 
 library:

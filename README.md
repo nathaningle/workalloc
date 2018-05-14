@@ -14,3 +14,5 @@ where:
 * `YYYY-mm-dd HHMM` is the timestamp for starting this piece of work,
 * `what` is the description of this piece of work (this will be the aggregation term), and
 * `comment` can be anything and is ignored.
+
+Blank lines and comments (starting with `#`) are ignored.
