@@ -45,9 +45,11 @@ padDays tasknames xs = dayBefore : xs ++ [dayAfter]
 tagWithDay :: NonEmpty TimeSpent -> (Day, [TimeSpent])
 tagWithDay xs = (localDay (tsStartTime (NE.head xs)), NE.toList xs)
 
--- | Determine the number of hours spent on the named task.
-lookupTaskHours :: TaskTotals -> String -> Double
-lookupTaskHours (TaskTotals m) k = durationToHours $ M.findWithDefault 0 k m
+-- | Determine the number of hours spent per named task.
+taskTotalsToHours :: [String] -> TaskTotals -> [Double]
+taskTotalsToHours names totals = map (lookupTaskHours totals) names
+  where
+    lookupTaskHours (TaskTotals m) k = durationToHours $ M.findWithDefault 0 k m
 
 -- | Extract an ordered list of task names from a 'TaskTotals'.
 getTaskNames :: TaskTotals -> [String]
@@ -65,20 +67,10 @@ equatingStartDay = equating (localDay . tsStartTime)
 taskTotalDataPerDay :: [TimeSpent] -> ([String], [(Day, [Double])])
 taskTotalDataPerDay intervals = (taskNames, padDays taskNames taskHoursPerDay)
   where
-    intervalsPerDay :: [(Day, [TimeSpent])]
-    intervalsPerDay = map tagWithDay $ NE.groupBy equatingStartDay intervals
-
-    taskTotalsPerDay :: [(Day, TaskTotals)]
-    taskTotalsPerDay = map (fmap tallyIntervals) intervalsPerDay
-
-    taskNames :: [String]
     taskNames = nub $ sort $ concatMap (getTaskNames . snd) taskTotalsPerDay
-
-    taskTotalsToHours :: TaskTotals -> [Double]
-    taskTotalsToHours tt = map (lookupTaskHours tt) taskNames
-
-    taskHoursPerDay :: [(Day, [Double])]
-    taskHoursPerDay = map (fmap taskTotalsToHours) taskTotalsPerDay
+    taskTotalsPerDay = map tagAndTally $ NE.groupBy equatingStartDay intervals
+    tagAndTally = fmap tallyIntervals . tagWithDay
+    taskHoursPerDay = map (fmap (taskTotalsToHours taskNames)) taskTotalsPerDay
 
 -- | Prepare total chart data.  The principle of least surprise dictates that
 -- the type signature ought to resemble that from 'taskTotalDataPerDay'.
