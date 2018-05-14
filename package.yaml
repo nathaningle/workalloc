@@ -18,9 +18,19 @@ dependencies:
   - base >= 4.7 && < 5
   - Chart
   - Chart-cairo
+  - containers
   - data-default
   - time
+
+library:
+  source-dirs: src
+  exposed-modules:
+    - Allocation
+    - FileInput
+    - Types
 
 executables:
   workalloc:
     main:             app/workalloc.hs
+    dependencies:
+      - workalloc
